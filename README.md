@@ -162,12 +162,12 @@ flowchart LR
 
 ### 3. Device Connectivity Implementation
 
-- [ ] **BLE Communication Setup**
-  - [ ] Implement device discovery and pairing
-  - [ ] Connect to audio characteristic (`19B10001-E8F2-537E-4F6C-D104768A1214`)
-  - [ ] Subscribe to codec type characteristic (`19B10002-E8F2-537E-4F6C-D104768A1214`)
-  - [ ] Handle connection failures and reconnection logic
-  - [ ] Implement connection status monitoring
+- [x] **BLE Communication Setup**
+  - [x] Implement device discovery and pairing
+  - [x] Connect to audio characteristic (`19B10001-E8F2-537E-4F6C-D104768A1214`)
+  - [x] Subscribe to codec type characteristic (`19B10002-E8F2-537E-4F6C-D104768A1214`)
+  - [x] Handle connection failures and reconnection logic
+  - [x] Implement connection status monitoring
 
 - [ ] **Audio Stream Processing**
   - [ ] Implement Opus audio decoder (16kHz, mono)
