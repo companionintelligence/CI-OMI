@@ -284,12 +284,12 @@ class EventLogger:
             if self.db is None:
                 await self.initialize()
             
-            async with self.db.execute(
-                "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp",
-                (session_id,)
-            ) as cursor:
+            query = "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp DESC"
+            
+            async with self.db.execute(query, [session_id]) as cursor:
                 rows = await cursor.fetchall()
             
+            # Convert to dictionaries
             events = []
             for row in rows:
                 event = {
@@ -309,7 +309,15 @@ class EventLogger:
             return events
             
         except Exception as e:
-            logger.error(f"❌ Error getting session events: {e}")
+            logger.error(f"❌ Error getting events by session: {e}")
+            return []
+    
+    async def get_events_by_type(self, event_type: str, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get events by specific type"""
+        try:
+            return await self.get_events(limit=limit, offset=offset, event_type=event_type)
+        except Exception as e:
+            logger.error(f"❌ Error getting events by type: {e}")
             return []
     
     async def _update_daily_stats(self, event: Dict[str, Any]):

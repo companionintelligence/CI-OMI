@@ -7,7 +7,7 @@ import logging
 import numpy as np
 import wave
 import io
-from typing import Optional, List, Queue
+from typing import Optional, List
 from dataclasses import dataclass
 from datetime import datetime
 import tempfile
@@ -93,17 +93,20 @@ class AudioProcessor:
                     overlap_samples = int(self.config.sample_rate * self.config.overlap_duration)
                     self.audio_buffer = self.audio_buffer[samples_needed - overlap_samples:]
                     
+                    # Save audio sample automatically
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"audio_chunk_{timestamp}.wav"
+                    await self.save_audio_sample(chunk, filename)
+                    
                     # Add to processing queue
                     try:
                         await self.processing_queue.put(chunk)
                         self.stats["chunks_processed"] += 1
                         self.stats["last_activity"] = datetime.now().isoformat()
                     except asyncio.QueueFull:
-                        logger.warning("⚠️  Audio processing queue full, dropping chunk")
-                    
-                    return chunk
-            
-            return None
+                        logger.warning("⚠️  Audio processing queue is full")
+                
+                return audio_array
             
         except Exception as e:
             logger.error(f"❌ Error processing Opus stream: {e}")

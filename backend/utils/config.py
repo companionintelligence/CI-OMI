@@ -61,6 +61,11 @@ class SystemConfig:
     api_port: int = int(os.getenv("API_PORT", "8000"))
     websocket_heartbeat: int = int(os.getenv("WEBSOCKET_HEARTBEAT", "30"))
     
+    # Omi API Configuration
+    omi_api_key: str = os.getenv("OMI_API_KEY", "")
+    omi_api_url: str = os.getenv("OMI_API_URL", "https://api.omi.me")
+    omi_api_timeout: int = int(os.getenv("OMI_API_TIMEOUT", "30"))
+    
     # Logging Configuration
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     log_file: str = os.getenv("LOG_FILE", "logs/omi_companion.log")

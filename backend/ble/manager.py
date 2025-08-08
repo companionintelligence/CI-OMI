@@ -36,15 +36,26 @@ class BLEManager:
             logger.info(f"🔍 Scanning for BLE devices (timeout: {timeout}s)...")
             devices = await BleakScanner.discover(timeout=timeout)
             
+            logger.info(f"📱 Found {len(devices)} total BLE devices:")
+            for device in devices:
+                if device.name:
+                    logger.info(f"  📱 {device.name} ({device.address}) RSSI: {device.rssi}")
+                else:
+                    logger.info(f"  📱 Unknown device ({device.address}) RSSI: {device.rssi}")
+            
             omi_devices = []
             for device in devices:
                 if device.name and any(keyword in device.name.lower() 
-                                     for keyword in ["omi", "devkit"]):
+                                     for keyword in ["omi", "devkit", "omi", "glass"]):
                     omi_devices.append(device)
-                    logger.info(f"📱 Found Omi device: {device.name} ({device.address}) RSSI: {device.rssi}")
+                    logger.info(f"🎯 Found Omi device: {device.name} ({device.address}) RSSI: {device.rssi}")
             
             if not omi_devices:
-                logger.info("❌ No Omi devices found")
+                logger.info("❌ No Omi devices found. Make sure your device is:")
+                logger.info("   - Powered on and in pairing mode")
+                logger.info("   - Within range (within 10 meters)")
+                logger.info("   - Advertising as 'Omi', 'DevKit', or similar")
+                logger.info("   - Not already connected to another device")
             
             return omi_devices
             
