@@ -1,10 +1,23 @@
 name: Deploy Apps-Js to Cloud RUN
 
+# >>> ci-local:gated original triggers below, restore with `ci-local restore`
+# on:
+#   push:
+#     branches: [ "main", "development" ]
+#     paths:
+#       - 'plugins/apps-js/**'
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Select the environment to deploy to'
+#         required: true
+#         default: 'development'
+#       branch:
+#         description: 'Branch to deploy from'
+#         required: true
+#         default: 'main'
+# <<< ci-local:gated
 on:
-  push:
-    branches: [ "main", "development" ]
-    paths:
-      - 'plugins/apps-js/**'
   workflow_dispatch:
     inputs:
       environment:
