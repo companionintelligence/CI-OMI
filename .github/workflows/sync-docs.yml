@@ -8,6 +8,10 @@ on:
       - "docs/**.mdx"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync-docs:
     runs-on: ubuntu-latest

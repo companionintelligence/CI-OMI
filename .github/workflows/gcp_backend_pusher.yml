@@ -16,6 +16,10 @@ on:
         required: true
         default: 'main'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   SERVICE: pusher
   REGION: us-central1

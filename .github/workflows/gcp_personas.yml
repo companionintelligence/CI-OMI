@@ -13,6 +13,10 @@ on:
         default: 'main'
 
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   SERVICE: omi-web
   REGION: us-central1

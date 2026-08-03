@@ -8,6 +8,10 @@ on:
     paths:
       - 'plugins/example/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   SERVICE: plugins
   REGION: us-central1
