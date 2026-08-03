@@ -2,11 +2,15 @@ name: Deploy Plugins to Cloud RUN
 
 # TODO: determine if changes to backend folder before pushing
 
+# >>> ci-local:gated original triggers below, restore with `ci-local restore`
+# on:
+#   push:
+#     branches: [ "main", "development" ]
+#     paths:
+#       - 'plugins/example/**'
+# <<< ci-local:gated
 on:
-  push:
-    branches: [ "main", "development" ]
-    paths:
-      - 'plugins/example/**'
+  workflow_dispatch:
 
 env:
   SERVICE: plugins

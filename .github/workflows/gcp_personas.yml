@@ -1,10 +1,19 @@
 name: Deploy Personas to Cloud RUN
 
+# >>> ci-local:gated original triggers below, restore with `ci-local restore`
+# on:
+#   push:
+#     branches: [ "main", "development" ]
+#     paths:
+#       - 'web/personas-open-source/**'
+#   workflow_dispatch:
+#     inputs:
+#       branch:
+#         description: 'Branch to deploy from'
+#         required: true
+#         default: 'main'
+# <<< ci-local:gated
 on:
-  push:
-    branches: [ "main", "development" ]
-    paths:
-      - 'web/personas-open-source/**'
   workflow_dispatch:
     inputs:
       branch:

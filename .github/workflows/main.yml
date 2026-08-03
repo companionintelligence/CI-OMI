@@ -1,10 +1,19 @@
 name: GitHub Issue Sync
 
+# >>> ci-local:gated original triggers below, restore with `ci-local restore`
+# on:
+#   issues:
+#     types:
+#       - opened
+#       - labeled
+#   workflow_dispatch:
+#     inputs:
+#       excludeClosed:
+#         description: 'Exclude closed issues in the sync.'
+#         type: boolean 
+#         default: true
+# <<< ci-local:gated
 on:
-  issues:
-    types:
-      - opened
-      - labeled
   workflow_dispatch:
     inputs:
       excludeClosed:
