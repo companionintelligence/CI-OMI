@@ -12,6 +12,10 @@ name: Sync Mintlify Docs back to Github
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync-docs:
     runs-on: ubuntu-latest
