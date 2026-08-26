@@ -543,6 +543,11 @@ curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
 `./scripts/setup.sh` and `./run.sh` generate a key when they create a fresh
 `.env`; otherwise use `openssl rand -hex 32`. See [`.env.example`](.env.example).
 
+Config-bearing responses redact credentials: `GET /api/status` and
+`PUT /api/config` report `"omi_api_key_configured": true|false` instead of the
+`omi_api_key` value, so holding this service's key does not hand a caller the
+upstream api.omi.me one.
+
 **The default is closed.** With no key configured the service refuses every
 guarded request with `503` rather than serving it - there is no development mode
 in which the check is skipped.

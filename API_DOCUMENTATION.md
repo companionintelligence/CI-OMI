@@ -311,6 +311,25 @@ GET /api/storage/images?limit=50
 GET /api/status
 ```
 
+The `config` object is **redacted**. Any field whose name ends in `_key`,
+`_token`, `_secret` or `_password` is omitted and replaced by a
+`<field>_configured` boolean, so a caller learns whether a credential is set but
+never what it is:
+
+```json
+{
+  "status": "running",
+  "config": {
+    "ollama_url": "http://localhost:11434",
+    "api_port": 8000,
+    "omi_api_key_configured": true
+  }
+}
+```
+
+The same redaction applies to the `config` in a `PUT /api/config` response and to
+the `config_updated` message broadcast on `/ws/live`.
+
 #### Start System
 ```http
 POST /api/start

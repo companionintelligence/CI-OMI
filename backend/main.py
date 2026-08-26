@@ -8,7 +8,7 @@ import json
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from fastapi import FastAPI, WebSocket, HTTPException, BackgroundTasks, APIRouter, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,7 +95,9 @@ class OmiCompanionSystem:
                 "connected_devices": len(self.connected_devices),
                 "active_sessions": len(self.active_sessions),
                 "ollama_available": await self.ollama_client.health_check(),
-                "config": asdict(self.config)
+                # Redacted: the config holds credentials (omi_api_key), and this
+                # route is reachable by anyone holding the shared API key.
+                "config": self.config.to_public_dict()
             }
         
         @router.post("/api/start")
@@ -177,9 +179,9 @@ class OmiCompanionSystem:
                 
                 await self.broadcast_to_websockets({
                     "type": "config_updated", 
-                    "data": asdict(self.config)
+                    "data": self.config.to_public_dict()
                 })
-                return {"status": "success", "config": asdict(self.config)}
+                return {"status": "success", "config": self.config.to_public_dict()}
             except Exception as e:
                 logger.error(f"Error updating config: {e}")
                 raise HTTPException(status_code=500, detail=str(e))

@@ -27,9 +27,11 @@ API_KEY_QUERY_PARAM = "api_key"
 # operators out of an appliance they can already reach over the local network.
 MIN_API_KEY_LENGTH = 16
 
-# Deliberately NOT a field on SystemConfig. `GET /api/status` serialises the whole
-# config object with asdict() and `PUT /api/config` setattr()s arbitrary keys onto
-# it, so anything stored there is both readable and writable over the API.
+# Deliberately NOT a field on SystemConfig. `PUT /api/config` setattr()s arbitrary
+# keys onto that object, so anything stored there is rewritable over the API - and
+# rewriting the guard's own key from behind the guard is a trapdoor, not a feature.
+# (Config responses are redacted by `SystemConfig.to_public_dict()`, so a secret
+# living there would at least not be readable.)
 api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
 
 
