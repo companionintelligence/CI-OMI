@@ -513,14 +513,39 @@ flowchart LR
 
 ### API Endpoints
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/events` | POST | Submit new event data |
-| `/api/events` | GET | Retrieve event history |
-| `/api/status` | GET | System status and health |
-| `/api/config` | GET/PUT | Feature configuration |
-| `/api/devices` | GET | Connected device status |
-| `/ws/live` | WebSocket | Real-time updates |
+| Endpoint | Method | Purpose | Auth |
+|----------|--------|---------|------|
+| `/health` | GET | Liveness probe | none |
+| `/api/events` | POST | Submit new event data | `X-API-Key` |
+| `/api/events` | GET | Retrieve event history | `X-API-Key` |
+| `/api/status` | GET | System status and configuration | `X-API-Key` |
+| `/api/config` | PUT | Feature configuration | `X-API-Key` |
+| `/api/devices` | GET | Connected device status | `X-API-Key` |
+| `/ws/live` | WebSocket | Real-time updates | `X-API-Key` |
+
+Full list, including the capture, storage, streaming and webhook routes:
+[`API_DOCUMENTATION.md`](API_DOCUMENTATION.md).
+
+### API Authentication
+
+> **⚠️ BREAKING CHANGE for existing deployments.** Every endpoint except
+> `GET /health` now requires an API key. Servers must be given one and every
+> client - including anything POSTing to `/api/webhooks/*` - must be updated to
+> send it.
+
+Set `OMI_COMPANION_API_KEY` in `.env` or the server environment, and send the same
+value in the `X-API-Key` header:
+
+```bash
+curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
+```
+
+`./scripts/setup.sh` and `./run.sh` generate a key when they create a fresh
+`.env`; otherwise use `openssl rand -hex 32`. See [`.env.example`](.env.example).
+
+**The default is closed.** With no key configured the service refuses every
+guarded request with `503` rather than serving it - there is no development mode
+in which the check is skipped.
 
 ---
 
