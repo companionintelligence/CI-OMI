@@ -37,10 +37,23 @@ cd ..
 echo "📁 Creating data directories..."
 mkdir -p data/{events,audio_samples,face_embeddings,logs}
 
+# Generate an API key if one was not supplied. The backend refuses every
+# endpoint except /health until this is set, so a blank value would leave a
+# fresh install unusable.
+if [ -z "$OMI_COMPANION_API_KEY" ]; then
+    OMI_COMPANION_API_KEY=$(openssl rand -hex 32 2>/dev/null \
+        || python3 -c "import secrets; print(secrets.token_hex(32))")
+fi
+
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "⚙️  Creating .env file..."
     cat > .env << EOF
+# API Authentication (REQUIRED)
+# Clients must send this as the X-API-Key header. Rotate by editing this file
+# and restarting the service.
+OMI_COMPANION_API_KEY=$OMI_COMPANION_API_KEY
+
 # Ollama Configuration
 OLLAMA_URL=http://localhost:11434
 OLLAMA_VISION_MODEL=moondream:1.8b-v2-fp16
