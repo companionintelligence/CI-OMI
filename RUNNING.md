@@ -84,7 +84,10 @@ Or use the provided run script:
 ### Step 2: Configuration
 
 1. **Environment Variables**
-   The setup script creates a `.env` file with default settings. You can modify it:
+   The setup script creates a `.env` file with default settings, and on an
+   upgrade appends a generated `OMI_COMPANION_API_KEY` to an existing `.env`
+   that has none (it never overwrites a value that is already there). You can
+   modify it:
 
    ```bash
    # Edit .env file

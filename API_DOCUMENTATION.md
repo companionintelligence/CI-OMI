@@ -20,7 +20,9 @@ curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
 ```
 
 Generate a key with `openssl rand -hex 32`. `./scripts/setup.sh` and `./run.sh`
-generate one automatically when they create a fresh `.env`.
+generate one automatically and write it to `.env` - both when creating a fresh
+file and when an existing `.env` has no `OMI_COMPANION_API_KEY` line. An existing
+value is never overwritten, and the path written to is printed.
 
 **The default is closed.** If `OMI_COMPANION_API_KEY` is unset or empty, the
 service does not fall back to open access - it refuses every guarded request with

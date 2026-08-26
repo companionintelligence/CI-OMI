@@ -540,8 +540,11 @@ value in the `X-API-Key` header:
 curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
 ```
 
-`./scripts/setup.sh` and `./run.sh` generate a key when they create a fresh
-`.env`; otherwise use `openssl rand -hex 32`. See [`.env.example`](.env.example).
+`./scripts/setup.sh` and `./run.sh` provision the key for you: they generate one
+and write it to `.env` both when creating a fresh file and when an existing `.env`
+has no `OMI_COMPANION_API_KEY` line, printing the path they wrote it to. An
+existing value is never overwritten. To do it by hand, use `openssl rand -hex 32`.
+See [`.env.example`](.env.example).
 
 Config-bearing responses redact credentials: `GET /api/status` and
 `PUT /api/config` report `"omi_api_key_configured": true|false` instead of the
