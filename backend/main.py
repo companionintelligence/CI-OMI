@@ -8,9 +8,9 @@ import json
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
-from fastapi import FastAPI, WebSocket, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, HTTPException, BackgroundTasks, APIRouter, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -22,6 +22,7 @@ from ai.ollama_client import OllamaClient
 from ai.omi_client import OmiClient
 from utils.event_logger import EventLogger
 from utils.config import SystemConfig
+from utils import auth
 
 # Configure logging
 logging.basicConfig(
@@ -65,8 +66,27 @@ class OmiCompanionSystem:
     
     def setup_routes(self):
         """Setup API routes"""
-        
-        @self.app.get("/api/status")
+
+        # Liveness only, deliberately unauthenticated so nginx and container
+        # health checks can still reach the process. Exposes no configuration,
+        # device or event data.
+        public_router = APIRouter()
+
+        # Everything that reads user data or mutates state sits behind the shared
+        # API key. Declared once on the router rather than per-handler so a route
+        # added later cannot accidentally ship unauthenticated.
+        router = APIRouter(dependencies=[Security(auth.require_api_key)])
+
+        # A WebSocket handshake cannot carry an HTTPException response, so it uses
+        # the WebSocket flavour of the same check, which closes with 1008 instead.
+        ws_router = APIRouter(dependencies=[Depends(auth.require_api_key_ws)])
+
+        @public_router.get("/health")
+        async def health_check():
+            """Liveness probe for nginx and process supervisors"""
+            return {"status": "ok"}
+
+        @router.get("/api/status")
         async def get_status():
             """Get system status"""
             return {
@@ -75,10 +95,12 @@ class OmiCompanionSystem:
                 "connected_devices": len(self.connected_devices),
                 "active_sessions": len(self.active_sessions),
                 "ollama_available": await self.ollama_client.health_check(),
-                "config": asdict(self.config)
+                # Redacted: the config holds credentials (omi_api_key), and this
+                # route is reachable by anyone holding the shared API key.
+                "config": self.config.to_public_dict()
             }
         
-        @self.app.post("/api/start")
+        @router.post("/api/start")
         async def start_system(background_tasks: BackgroundTasks):
             """Start the capture system"""
             if not self.system_running:
@@ -86,7 +108,7 @@ class OmiCompanionSystem:
                 return {"status": "starting", "message": "System startup initiated"}
             return {"status": "already_running", "message": "System is already running"}
         
-        @self.app.post("/api/stop")
+        @router.post("/api/stop")
         async def stop_system():
             """Stop the capture system"""
             if self.system_running:
@@ -94,7 +116,7 @@ class OmiCompanionSystem:
                 return {"status": "stopped", "message": "System stopped successfully"}
             return {"status": "already_stopped", "message": "System is already stopped"}
         
-        @self.app.get("/api/devices")
+        @router.get("/api/devices")
         async def get_devices():
             """Get connected device information"""
             devices = self.connected_devices.copy()
@@ -119,7 +141,7 @@ class OmiCompanionSystem:
             
             return {"devices": devices}
         
-        @self.app.post("/api/events")
+        @router.post("/api/events")
         async def submit_event(event: dict):
             """Submit new event data"""
             try:
@@ -136,7 +158,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error submitting event: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/events")
+        @router.get("/api/events")
         async def get_events(limit: int = 100, offset: int = 0):
             """Retrieve event history"""
             try:
@@ -147,7 +169,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error retrieving events: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.put("/api/config")
+        @router.put("/api/config")
         async def update_config(config_updates: dict):
             """Update system configuration"""
             try:
@@ -157,14 +179,14 @@ class OmiCompanionSystem:
                 
                 await self.broadcast_to_websockets({
                     "type": "config_updated", 
-                    "data": asdict(self.config)
+                    "data": self.config.to_public_dict()
                 })
-                return {"status": "success", "config": asdict(self.config)}
+                return {"status": "success", "config": self.config.to_public_dict()}
             except Exception as e:
                 logger.error(f"Error updating config: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.websocket("/ws/live")
+        @ws_router.websocket("/ws/live")
         async def websocket_endpoint(websocket: WebSocket):
             """WebSocket for real-time updates"""
             await websocket.accept()
@@ -194,7 +216,7 @@ class OmiCompanionSystem:
                 logger.info(f"WebSocket disconnected. Total connections: {len(self.websocket_connections)}")
         
         # Omi API endpoints
-        @self.app.get("/api/omi/devices")
+        @router.get("/api/omi/devices")
         async def get_omi_devices():
             """Get devices from Omi API"""
             if not self.omi_client:
@@ -207,7 +229,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error getting Omi devices: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/omi/devices/{device_id}/status")
+        @router.get("/api/omi/devices/{device_id}/status")
         async def get_omi_device_status(device_id: str):
             """Get status of a specific Omi device"""
             if not self.omi_client:
@@ -223,7 +245,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error getting device status: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/omi/devices/{device_id}/transcriptions")
+        @router.get("/api/omi/devices/{device_id}/transcriptions")
         async def get_omi_device_transcriptions(device_id: str, limit: int = 50):
             """Get transcriptions from a specific Omi device"""
             if not self.omi_client:
@@ -236,7 +258,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error getting transcriptions: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/omi/devices/{device_id}/command")
+        @router.post("/api/omi/devices/{device_id}/command")
         async def send_omi_command(device_id: str, command_data: dict):
             """Send a command to a specific Omi device"""
             if not self.omi_client:
@@ -258,7 +280,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error sending command: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/omi/user")
+        @router.get("/api/omi/user")
         async def get_omi_user_info():
             """Get current user information from Omi API"""
             if not self.omi_client:
@@ -275,7 +297,7 @@ class OmiCompanionSystem:
                 raise HTTPException(status_code=500, detail=str(e))
         
         # Capture and storage endpoints
-        @self.app.post("/api/capture/audio")
+        @router.post("/api/capture/audio")
         async def capture_audio():
             """Manually trigger audio capture"""
             try:
@@ -303,7 +325,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error capturing audio: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/capture/image")
+        @router.post("/api/capture/image")
         async def capture_image():
             """Manually trigger image capture"""
             try:
@@ -318,7 +340,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error capturing image: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/storage/audio")
+        @router.get("/api/storage/audio")
         async def list_audio_files(limit: int = 50):
             """List saved audio files"""
             try:
@@ -351,7 +373,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error listing audio files: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/storage/images")
+        @router.get("/api/storage/images")
         async def list_image_files(limit: int = 50):
             """List saved image files"""
             try:
@@ -384,7 +406,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error listing image files: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.delete("/api/storage/audio/{filename}")
+        @router.delete("/api/storage/audio/{filename}")
         async def delete_audio_file(filename: str):
             """Delete a specific audio file"""
             try:
@@ -399,7 +421,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error deleting audio file: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.delete("/api/storage/images/{filename}")
+        @router.delete("/api/storage/images/{filename}")
         async def delete_image_file(filename: str):
             """Delete a specific image file"""
             try:
@@ -415,7 +437,7 @@ class OmiCompanionSystem:
                 raise HTTPException(status_code=500, detail=str(e))
         
         # Streaming and Webhook endpoints
-        @self.app.get("/api/stream/audio/{device_id}")
+        @router.get("/api/stream/audio/{device_id}")
         async def stream_audio(device_id: str):
             """Stream real-time audio from a specific device"""
             try:
@@ -436,7 +458,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error setting up audio stream: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/stream/audio/{device_id}/live")
+        @router.get("/api/stream/audio/{device_id}/live")
         async def stream_audio_live(device_id: str):
             """Live audio streaming endpoint"""
             try:
@@ -464,7 +486,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error streaming audio: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/stream/transcript/{device_id}")
+        @router.get("/api/stream/transcript/{device_id}")
         async def stream_transcript(device_id: str):
             """Stream real-time transcriptions from a specific device"""
             try:
@@ -486,7 +508,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error setting up transcript stream: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/stream/transcript/{device_id}/live")
+        @router.get("/api/stream/transcript/{device_id}/live")
         async def stream_transcript_live(device_id: str):
             """Live transcript streaming endpoint"""
             try:
@@ -505,7 +527,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error streaming transcript: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/webhooks/conversation")
+        @router.post("/api/webhooks/conversation")
         async def conversation_webhook(conversation_data: dict):
             """Webhook endpoint for conversation events"""
             try:
@@ -543,7 +565,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error processing conversation webhook: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/webhooks/audio")
+        @router.post("/api/webhooks/audio")
         async def audio_webhook(audio_data: dict):
             """Webhook endpoint for real-time audio bytes"""
             try:
@@ -600,7 +622,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error processing audio webhook: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/webhooks/transcript")
+        @router.post("/api/webhooks/transcript")
         async def transcript_webhook(transcript_data: dict):
             """Webhook endpoint for real-time transcriptions"""
             try:
@@ -649,7 +671,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error processing transcript webhook: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/events/conversations")
+        @router.get("/api/events/conversations")
         async def get_conversation_events(limit: int = 50, offset: int = 0):
             """Get conversation events"""
             try:
@@ -664,7 +686,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error getting conversation events: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/events/audio")
+        @router.get("/api/events/audio")
         async def get_audio_events(limit: int = 50, offset: int = 0):
             """Get audio events"""
             try:
@@ -679,7 +701,7 @@ class OmiCompanionSystem:
                 logger.error(f"Error getting audio events: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/api/events/transcripts")
+        @router.get("/api/events/transcripts")
         async def get_transcript_events(limit: int = 50, offset: int = 0):
             """Get transcript events"""
             try:
@@ -693,7 +715,11 @@ class OmiCompanionSystem:
             except Exception as e:
                 logger.error(f"Error getting transcript events: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
-    
+
+        self.app.include_router(public_router)
+        self.app.include_router(router)
+        self.app.include_router(ws_router)
+
     async def broadcast_to_websockets(self, message: dict):
         """Broadcast message to all connected WebSocket clients"""
         if self.websocket_connections:
@@ -907,6 +933,7 @@ def create_app():
     @system.app.on_event("startup")
     async def startup_event():
         logger.info("🚀 Application starting up...")
+        auth.log_configuration_state()
     
     @system.app.on_event("shutdown")
     async def shutdown_event():

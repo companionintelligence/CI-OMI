@@ -84,7 +84,10 @@ Or use the provided run script:
 ### Step 2: Configuration
 
 1. **Environment Variables**
-   The setup script creates a `.env` file with default settings. You can modify it:
+   The setup script creates a `.env` file with default settings, and on an
+   upgrade appends a generated `OMI_COMPANION_API_KEY` to an existing `.env`
+   that has none (it never overwrites a value that is already there). You can
+   modify it:
 
    ```bash
    # Edit .env file
@@ -93,6 +96,10 @@ Or use the provided run script:
 
    Key settings:
    ```env
+   # API Authentication (REQUIRED - the server refuses every endpoint
+   # except /health without it, in every environment)
+   OMI_COMPANION_API_KEY=<generate with: openssl rand -hex 32>
+   
    # Ollama Configuration
    OLLAMA_URL=http://localhost:11434
    OLLAMA_VISION_MODEL=moondream:1.8b-v2-fp16
@@ -170,11 +177,23 @@ Or use the provided run script:
 
 ## Usage
 
+### Authenticating
+
+Every endpoint except `GET /health` requires the `X-API-Key` header. The setup
+script writes a generated key into `.env`; load it into your shell first:
+
+```bash
+export OMI_COMPANION_API_KEY=$(grep OMI_COMPANION_API_KEY .env | cut -d= -f2)
+```
+
+If the server has no key configured it returns `503` on every guarded request. It
+never falls back to open access.
+
 ### Starting the System
 
 1. **Via API**
    ```bash
-   curl -X POST http://localhost:8000/api/start
+   curl -X POST -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/start
    ```
 
 2. **Via Web Interface**
@@ -185,28 +204,33 @@ Or use the provided run script:
 
 1. **System Status**
    ```bash
-   curl http://localhost:8000/api/status
+   curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
    ```
 
 2. **Connected Devices**
    ```bash
-   curl http://localhost:8000/api/devices
+   curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/devices
    ```
 
 3. **Event Log**
    ```bash
-   curl http://localhost:8000/api/events
+   curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/events
    ```
 
 ### WebSocket Connection
 
-For real-time updates, connect to the WebSocket endpoint:
+For real-time updates, connect to the WebSocket endpoint. Browsers cannot set
+request headers on a WebSocket handshake, so the key goes in the `api_key` query
+parameter; non-browser clients should send the `X-API-Key` header instead, since
+query parameters are recorded in proxy access logs.
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/live');
+const ws = new WebSocket(`ws://localhost:8000/ws/live?api_key=${apiKey}`);
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     console.log('Received:', data);
 };
+// Without a valid key the upgrade fails with HTTP 403; onerror fires, not onmessage.
+ws.onclose = (event) => console.log('Closed:', event.code, event.reason);
 ```
 
 ## Troubleshooting
@@ -306,6 +330,9 @@ ci-capture-omi/
 
 ### Core Endpoints
 
+All of these require the `X-API-Key` header. `/ws/live` also accepts the key as an
+`api_key` query parameter, for browsers that cannot set headers on a handshake.
+
 - `GET /api/status` - System status
 - `POST /api/start` - Start capture system
 - `POST /api/stop` - Stop capture system
@@ -314,6 +341,11 @@ ci-capture-omi/
 - `POST /api/events` - Submit event
 - `PUT /api/config` - Update configuration
 - `WS /ws/live` - Real-time updates
+
+### Open Endpoints
+
+- `GET /health` - Liveness probe. The only unauthenticated route; returns
+  `{"status": "ok"}` and no system detail.
 
 ### Event Types
 

@@ -3,20 +3,32 @@
 Test script for audio and image capture functionality
 """
 import asyncio
+import os
 import requests
 import json
+import sys
 import time
+
+# Every endpoint below requires the shared API key. Export it before running:
+#   OMI_COMPANION_API_KEY=$(grep OMI_COMPANION_API_KEY .env | cut -d= -f2) python3 test_capture.py
+API_KEY = os.getenv("OMI_COMPANION_API_KEY", "")
+HEADERS = {"X-API-Key": API_KEY}
 
 def test_capture_endpoints():
     """Test the capture endpoints"""
     base_url = "http://localhost:8000"
+    
+    if not API_KEY:
+        print("❌ OMI_COMPANION_API_KEY is not set. The API refuses every request "
+              "except /health without it.")
+        sys.exit(1)
     
     print("🧪 Testing capture endpoints...")
     
     # Test audio capture
     print("\n1. Testing audio capture...")
     try:
-        response = requests.post(f"{base_url}/api/capture/audio")
+        response = requests.post(f"{base_url}/api/capture/audio", headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Audio capture: {data['message']}")
@@ -30,7 +42,7 @@ def test_capture_endpoints():
     # Test image capture
     print("\n2. Testing image capture...")
     try:
-        response = requests.post(f"{base_url}/api/capture/image")
+        response = requests.post(f"{base_url}/api/capture/image", headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Image capture: {data['message']}")
@@ -42,7 +54,7 @@ def test_capture_endpoints():
     # List saved audio files
     print("\n3. Listing saved audio files...")
     try:
-        response = requests.get(f"{base_url}/api/storage/audio")
+        response = requests.get(f"{base_url}/api/storage/audio", headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Found {data['total']} audio files")
@@ -56,7 +68,7 @@ def test_capture_endpoints():
     # List saved image files
     print("\n4. Listing saved image files...")
     try:
-        response = requests.get(f"{base_url}/api/storage/images")
+        response = requests.get(f"{base_url}/api/storage/images", headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Found {data['total']} image files")

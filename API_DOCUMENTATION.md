@@ -8,7 +8,57 @@ The Omi Companion API provides real-time audio streaming, conversation events, t
 
 ## Authentication
 
-Currently, the API uses API key authentication for Omi API integration. Webhook endpoints are open but should be secured in production.
+> **⚠️ BREAKING CHANGE.** Every endpoint except `GET /health` now requires an API
+> key. Existing deployments and clients **will break** until the server is given a
+> key and every caller is updated to send it.
+
+Set `OMI_COMPANION_API_KEY` in the server's environment (or `.env`) and send the
+same value in the `X-API-Key` header on every request:
+
+```bash
+curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
+```
+
+Generate a key with `openssl rand -hex 32`. `./scripts/setup.sh` and `./run.sh`
+generate one automatically and write it to `.env` - both when creating a fresh
+file and when an existing `.env` has no `OMI_COMPANION_API_KEY` line. An existing
+value is never overwritten, and the path written to is printed.
+
+**The default is closed.** If `OMI_COMPANION_API_KEY` is unset or empty, the
+service does not fall back to open access - it refuses every guarded request with
+`503 Service Unavailable`. There is no environment in which authentication is
+skipped: it is enforced identically in development and production.
+
+### What is protected
+
+| Scope | Auth |
+|-------|------|
+| `GET /health` | **Open.** Liveness only - returns `{"status": "ok"}` and nothing else. |
+| Everything else, including `/api/webhooks/*` and `/ws/live` | **API key required.** |
+
+`OMI_API_KEY` is unrelated: that is the upstream credential this service uses to
+call `api.omi.me`, not the credential clients use to call this service.
+
+### WebSocket
+
+`/ws/live` accepts the key in the `X-API-Key` header. Browsers cannot set request
+headers on a WebSocket handshake, so the `api_key` query parameter is accepted as
+well - it lands in proxy access logs, so prefer the header wherever the client can
+send one.
+
+```
+ws://localhost:8000/ws/live?api_key=<key>
+```
+
+A handshake without a valid key is rejected before it is accepted, so the client
+sees the upgrade fail with HTTP `403` rather than an open socket that closes.
+(The ASGI close code is `1008`, policy violation.)
+
+### Webhook senders
+
+`/api/webhooks/conversation`, `/api/webhooks/audio` and `/api/webhooks/transcript`
+are no longer open. Whatever is configured to POST to them must be updated to send
+the `X-API-Key` header, or its deliveries will start returning `401`.
 
 ## Endpoints
 
@@ -263,6 +313,25 @@ GET /api/storage/images?limit=50
 GET /api/status
 ```
 
+The `config` object is **redacted**. Any field whose name ends in `_key`,
+`_token`, `_secret` or `_password` is omitted and replaced by a
+`<field>_configured` boolean, so a caller learns whether a credential is set but
+never what it is:
+
+```json
+{
+  "status": "running",
+  "config": {
+    "ollama_url": "http://localhost:11434",
+    "api_port": 8000,
+    "omi_api_key_configured": true
+  }
+}
+```
+
+The same redaction applies to the `config` in a `PUT /api/config` response and to
+the `config_updated` message broadcast on `/ws/live`.
+
 #### Start System
 ```http
 POST /api/start
@@ -309,8 +378,10 @@ All endpoints return standard HTTP status codes:
 
 - `200`: Success
 - `400`: Bad Request
+- `401`: Unauthorized - missing or invalid `X-API-Key`
 - `404`: Not Found
 - `500`: Internal Server Error
+- `503`: Service Unavailable - the server has no `OMI_COMPANION_API_KEY` configured
 
 **Error Response Format:**
 ```json
@@ -342,7 +413,9 @@ All API requests are logged to `/var/log/nginx/companion_access.log` and `/var/l
 GET /health
 ```
 
-Returns the system status for monitoring purposes.
+Unauthenticated liveness probe for nginx and process supervisors. Returns
+`{"status": "ok"}` and deliberately nothing else - no configuration, device or
+event data. For the detailed system status use the authenticated `GET /api/status`.
 
 ## Deployment
 
@@ -378,8 +451,14 @@ sudo journalctl -u omi-companion -f
 # Start the application locally
 ./run.sh
 
-# Test endpoints
-curl http://localhost:8000/api/status
+# Load the generated key
+export OMI_COMPANION_API_KEY=$(grep OMI_COMPANION_API_KEY .env | cut -d= -f2)
+
+# Liveness needs no key
+curl http://localhost:8000/health
+
+# Everything else does
+curl -H "X-API-Key: $OMI_COMPANION_API_KEY" http://localhost:8000/api/status
 ```
 
 ### Testing Webhooks
@@ -387,15 +466,18 @@ curl http://localhost:8000/api/status
 # Test conversation webhook
 curl -X POST http://localhost:8000/api/webhooks/conversation \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $OMI_COMPANION_API_KEY" \
   -d '{"device_id": "test_device", "conversation_type": "voice"}'
 
 # Test audio webhook
 curl -X POST http://localhost:8000/api/webhooks/audio \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $OMI_COMPANION_API_KEY" \
   -d '{"device_id": "test_device", "audio_bytes": "base64_data"}'
 
 # Test transcript webhook
 curl -X POST http://localhost:8000/api/webhooks/transcript \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $OMI_COMPANION_API_KEY" \
   -d '{"device_id": "test_device", "transcript": "Hello world"}'
 ```

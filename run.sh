@@ -21,10 +21,61 @@ source venv/bin/activate
 # Set PYTHONPATH
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
 
+# API authentication. The backend refuses every endpoint except /health until
+# OMI_COMPANION_API_KEY is set, so a generated key has to be *persisted*, not just
+# held in a shell variable that dies with this process.
+#
+# Three cases, in order of precedence:
+#   1. Already in the environment - the operator is managing it, leave it alone.
+#   2. Already in .env - leave it there for load_dotenv() to pick up, so this
+#      script can never shadow the operator's value with a different one.
+#   3. Neither - generate one, export it for this run, and write it to .env below.
+api_key_was_generated=0
+if [ -n "$OMI_COMPANION_API_KEY" ]; then
+    export OMI_COMPANION_API_KEY
+elif [ -f ".env" ] && grep -q '^[[:space:]]*OMI_COMPANION_API_KEY[[:space:]]*=' .env; then
+    if ! grep -q '^[[:space:]]*OMI_COMPANION_API_KEY[[:space:]]*=[[:space:]]*[^[:space:]]' .env; then
+        echo "⚠️  OMI_COMPANION_API_KEY in .env is empty - every endpoint except /health will return 503."
+        echo "   Set it to a random secret, e.g. openssl rand -hex 32"
+    fi
+else
+    OMI_COMPANION_API_KEY=$(openssl rand -hex 32 2>/dev/null \
+        || python3 -c "import secrets; print(secrets.token_hex(32))")
+    export OMI_COMPANION_API_KEY
+    api_key_was_generated=1
+fi
+
+announce_generated_api_key() {
+    echo ""
+    echo "🔑 Generated a new OMI_COMPANION_API_KEY and wrote it to $(pwd)/.env"
+    echo "   Clients must send it as the X-API-Key header on every request:"
+    echo "     curl -H \"X-API-Key: \$OMI_COMPANION_API_KEY\" http://localhost:8000/api/status"
+    echo ""
+}
+
+# A .env written before authentication existed has no key at all. Append the
+# generated one rather than discarding it - otherwise the upgrade path ends in a
+# service that 503s every endpoint with nothing in the file to explain why.
+append_generated_api_key_to_env() {
+    cat >> .env << EOF
+
+# API Authentication (REQUIRED) - added automatically on upgrade.
+# Clients must send this as the X-API-Key header. Rotate by editing this file
+# and restarting the service.
+OMI_COMPANION_API_KEY=$OMI_COMPANION_API_KEY
+EOF
+    announce_generated_api_key
+}
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "⚠️  .env file not found. Creating default configuration..."
     cat > .env << EOF
+# API Authentication (REQUIRED)
+# Clients must send this as the X-API-Key header. Rotate by editing this file
+# and restarting the service.
+OMI_COMPANION_API_KEY=$OMI_COMPANION_API_KEY
+
 # Ollama Configuration
 OLLAMA_URL=http://localhost:11434
 OLLAMA_VISION_MODEL=moondream:1.8b-v2-fp16
@@ -71,6 +122,9 @@ API_PORT=8000
 LOG_LEVEL=INFO
 LOG_FILE=data/logs/omi_companion.log
 EOF
+    announce_generated_api_key
+elif [ "$api_key_was_generated" = "1" ]; then
+    append_generated_api_key_to_env
 fi
 
 # Create data directories if they don't exist

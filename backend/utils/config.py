@@ -1,12 +1,62 @@
 """
 System Configuration for Omi Companion App
 """
-from dataclasses import dataclass
-from typing import Dict, Any
+from dataclasses import asdict, dataclass, field, fields
+from typing import Any, Dict, Iterable, Set
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# A configuration field whose name ends in one of these holds a credential and
+# must never be serialised over the API. The rule is derived from the name rather
+# than a hand-written list of fields so that a secret added later is redacted by
+# default instead of leaking until somebody remembers to update the list.
+SECRET_FIELD_SUFFIXES = ("_key", "_token", "_secret", "_password")
+
+# Escape hatch for a secret whose name does not follow the convention. Declare it
+# as `my_credential: str = secret_field(os.getenv("MY_CREDENTIAL", ""))`.
+SECRET_FIELD_METADATA_FLAG = "secret"
+
+# Suffix a redacted field carries in serialised output: `omi_api_key` is replaced
+# by `omi_api_key_configured: true|false`. A status endpoint needs to know whether
+# a credential is present, never what it is.
+CONFIGURED_SUFFIX = "_configured"
+
+
+def secret_field(default: Any = "", **kwargs: Any) -> Any:
+    """Declare a dataclass field as holding a credential.
+
+    Only needed when the field name does not end in one of
+    `SECRET_FIELD_SUFFIXES`; names that do are detected automatically.
+    """
+    metadata = dict(kwargs.pop("metadata", {}))
+    metadata[SECRET_FIELD_METADATA_FLAG] = True
+    return field(default=default, metadata=metadata, **kwargs)
+
+
+def is_secret_field_name(name: str) -> bool:
+    """Whether a field name looks like a credential by naming convention"""
+    return name.endswith(SECRET_FIELD_SUFFIXES)
+
+
+def redact_secrets(
+    values: Dict[str, Any], secret_names: Iterable[str]
+) -> Dict[str, Any]:
+    """Replace each named secret with a boolean "is it set" indicator.
+
+    The key itself is dropped rather than blanked, so a caller cannot mistake a
+    masked placeholder for the real value.
+    """
+    secret_names = set(secret_names)
+    redacted: Dict[str, Any] = {}
+    for key, value in values.items():
+        if key in secret_names:
+            redacted[f"{key}{CONFIGURED_SUFFIX}"] = bool(str(value).strip())
+        else:
+            redacted[key] = value
+    return redacted
+
 
 @dataclass
 class SystemConfig:
@@ -86,8 +136,32 @@ class SystemConfig:
                 setattr(self, key, value)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert configuration to dictionary"""
+        """Convert configuration to dictionary, secrets included.
+
+        For anything that leaves the process - an API response, a WebSocket
+        broadcast, a log line - use `to_public_dict()` instead.
+        """
         return {
             key: value for key, value in self.__dict__.items()
             if not key.startswith('_')
         }
+
+    def secret_field_names(self) -> Set[str]:
+        """Fields holding credentials, by naming convention or explicit marker"""
+        return {
+            f.name
+            for f in fields(self)
+            if f.metadata.get(SECRET_FIELD_METADATA_FLAG)
+            or is_secret_field_name(f.name)
+        }
+
+    def to_public_dict(self) -> Dict[str, Any]:
+        """Serialise for API responses, with every credential redacted.
+
+        `omi_api_key` and any future secret are replaced by a
+        `<field>_configured` boolean. Without this, possession of the shared API
+        key would hand a caller every other credential the appliance holds - over
+        plain HTTP, from a status endpoint that only ever needed to say whether
+        the upstream integration is set up.
+        """
+        return redact_secrets(asdict(self), self.secret_field_names())
