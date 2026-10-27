@@ -2,7 +2,7 @@
 
 <p align="center"><strong>Multi-Modal AI System Architecture for omiGlass &amp; DevKit 2</strong></p>
 
-<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a></p>
+<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
 
 ### System Overview
 
