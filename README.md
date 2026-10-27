@@ -1,5 +1,8 @@
-# Omi Companion Capture App
-## Multi-Modal AI System Architecture for omiGlass & DevKit 2
+<h1 align="center">Omi Companion Capture App</h1>
+
+<p align="center"><strong>Multi-Modal AI System Architecture for omiGlass &amp; DevKit 2</strong></p>
+
+<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
 
 ### System Overview
 
@@ -558,3 +561,19 @@ in which the check is skipped.
 ---
 
 **System Goal**: Create a comprehensive AI companion system that captures and analyzes multi-modal data (audio, video, sensors) from Omi devices, processes it through local AI models via Ollama, and provides real-time insights through a web interface. The system logs all detected **people, places, things, and events** in structured JSON format while maintaining privacy through local-only processing.
+
+<!-- companion-hub-readme-deep-review -->
+
+## Implementation status and data boundary
+
+The architecture and implementation checklist in this README describe the intended end-to-end system. Use the actual setup scripts, API routes, and current repository code to confirm which device or analysis path is implemented before treating a checklist item as available.
+
+| Boundary | Current documented behavior |
+|---|---|
+| Device links | omiGlass / DevKit 2 hardware and BLE characteristics are listed below |
+| Local processing | Audio, vision, and model pipeline components are described in the architecture sections |
+| API access | All routes except `GET /health` require an API key; the API returns `503` when no key is configured |
+| Secret handling | Status/config responses redact the upstream OMI key; setup scripts preserve an existing `.env` |
+
+Keep the API key and captured audio/video out of commits, screenshots, and issue reports. Confirm implementation status against the API and test sections before connecting a device.
+
