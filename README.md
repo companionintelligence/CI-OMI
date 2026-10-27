@@ -2,7 +2,16 @@
 
 <p align="center"><strong>Multi-Modal AI System Architecture for omiGlass &amp; DevKit 2</strong></p>
 
-<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
+[![release](https://img.shields.io/badge/release-not%20published-757575?style=flat-square)](https://github.com/companionintelligence/CI-OMI/releases)
+[![platform](https://img.shields.io/badge/platform-OMI%20DevKit%202%20%C2%B7%20omiGlass-0a6358?style=flat-square)](https://github.com/companionintelligence/CI-OMI)
+[![License](https://img.shields.io/badge/license-PolyForm%20NC%201.0-0a6358?style=flat-square)](LICENSE.md)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/yQp9hwpzAa)
+
+<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a> · <a href="API_DOCUMENTATION.md">Documentation</a></p>
+
+<p align="center">
+  <a href="#implementation-checklist"><img src="https://img.shields.io/badge/Hardware%20setup-Hardware%20setup-0a6358?style=for-the-badge&logo=github&logoColor=white" alt="Hardware setup" height="30"></a>
+</p>
 
 ### System Overview
 
@@ -464,6 +473,28 @@ flowchart LR
   - [ ] Create developer documentation
 
 ---
+
+
+## Features
+
+| Feature | What it provides |
+|---|---|
+| **Wearable ingestion** | Receive BLE data and audio from supported OMI devices. |
+| **Local media processing** | Decode audio, run speech recognition and analyze camera frames. |
+| **Authenticated services** | Expose event, transcript and media APIs behind the companion service key. |
+
+## How it fits together
+
+The wearable sends BLE or Wi-Fi data to a companion host; audio and camera inputs are processed locally and exposed through authenticated event and media APIs.
+
+```mermaid
+flowchart LR
+  Wearable[OMI DevKit or glasses] --> BLE[BLE and audio receiver]
+  BLE --> Media[Decode and local STT/CV]
+  Media --> Events[Transcript and event records]
+  Events --> API[Authenticated local API]
+  API --> Memory[Optional Companion Memory sync]
+```
 
 ## Architecture Components
 
