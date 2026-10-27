@@ -1,5 +1,8 @@
-# Omi Companion Capture App
-## Multi-Modal AI System Architecture for omiGlass & DevKit 2
+<h1 align="center">Omi Companion Capture App</h1>
+
+<p align="center"><strong>Multi-Modal AI System Architecture for omiGlass &amp; DevKit 2</strong></p>
+
+<p align="center"><a href="https://github.com/companionintelligence/CI-OMI">Source</a></p>
 
 ### System Overview
 
