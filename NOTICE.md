@@ -12,11 +12,28 @@ redistributing this repository or shipping a binary built from it.
 
 1. [`certifi`](https://github.com/certifi/python-certifi) — **MPL-2.0** — runtime
 
+## Vendored Omi SDK files (MIT, upstream terms)
+
+The following directories contain SDK code derived from the upstream
+[Omi](https://github.com/BasedHardware/omi) project (Based Hardware), which is
+licensed under the **MIT License**. Those files are **not** relicensed by this
+repository: they remain under the MIT License of their upstream authors, and
+their copyright and permission notices must be retained in any copy or
+substantial portion you redistribute.
+
+- `sdks/react-native/` — `@omiai/omi-react-native` (its `package.json` and
+  `omi-react-native.podspec` license field intentionally stays `MIT`)
+- `sdks/swift/` — Omi Swift SDK (MIT, per its README)
+- `sdks/omi-expo/` — Omi Expo/native module code
+- `sdks/python/` — community Omi Python SDK (MIT, per its README)
+
+Everything else in this repository is first-party and covered by the next section.
+
 ## First-party code
 
 Except as noted above, the contents of this repository are
 Copyright © LifeScope INC, DBA Companion Intelligence (<https://ci.computer>),
-licensed under the terms in [LICENSE](LICENSE) / [LICENSE.md](LICENSE.md).
+licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md) (free for noncommercial use).
 
 ---
 

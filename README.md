@@ -608,3 +608,8 @@ The architecture and implementation checklist in this README describe the intend
 
 Keep the API key and captured audio/video out of commits, screenshots, and issue reports. Confirm implementation status against the API and test sections before connecting a device.
 
+## License
+
+Companion OMI is free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). See the [License FAQ](docs/License-FAQ.md) for common questions.
+
+Vendored Omi SDK code under `sdks/` is derived from the upstream [Omi](https://github.com/BasedHardware/omi) project and remains under the MIT License with its original attribution; see [NOTICE.md](NOTICE.md).
